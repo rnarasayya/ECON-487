@@ -1,4 +1,4 @@
-# ECON-487
+# ECON-487 Lab 1
 Empirical Section
 1)	Download the orange juice data from the course website and create an R script for this assignment. 
 2)	Change the working directory so that R knows where to look for the data (tip: create a Econ487 folder and save datasets there).  See setwd(). [You can type ?setwd to see the help file.] 

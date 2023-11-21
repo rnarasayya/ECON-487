@@ -1,0 +1,110 @@
+---
+title: "ECON 487 Lab 2"
+author: "Rohan Narasayya"
+date: "2023-10-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+oj <- read.csv("oj.csv")
+library(ggplot2)
+head(oj)
+ggplot(oj, aes(y = price)) + geom_boxplot()
+ggplot(oj, aes(y = log(price))) + geom_boxplot()
+ggplot(oj, aes(factor(brand), price)) + geom_boxplot(aes(fill = brand))
+ggplot(oj, aes(factor(brand), log(price))) + geom_boxplot(aes(fill = brand))
+```
+
+The variation of price in general is pretty symmetric since the median line of the log plot is in the middle of the box, but there are a few outliers below the box. However, when we look by brand on the, we see that Tropicana and Dominicks have slightly different variation than the general price variation and the Minute Maid variation. 
+The reason log plots look different is because they transform the data to compresses the scale of the plot. This means that large values are plotted closer together, while small values are spread out. I think this makes the patterns and trends in the data more apparent, which makes the log plots more informative.
+
+```{r}
+ggplot(oj, aes(x = log(price), y = logmove)) + geom_point(aes(color = factor(brand)))
+```
+
+We can see that log of quantity demanded decreases slightly as log of price increases. This indicates that demand for orange juice is elastic.
+
+```{r}
+lmQuantity = lm(logmove~log(price), data = oj)
+summary(lmQuantity)
+```
+
+The R-squared value is only .2081 so the model does not fit that well, we would want a value closer to 1 to believe the model fits well. The elasticity value is -1.60131, which is relatively elastic. It makes sense because the plots show that quantity demanded for orange juice is elastic, and it should be since each brand is a substitute for the other two.
+
+```{r}
+lmBrand = lm(logmove~log(price) + brand, data = oj)
+summary(lmBrand)
+```
+
+The elasticity value is more negative now, at -3.13869 and the intercept is almost the same. Now the new coefficients for each brand are positive, which represents the amount the log of quantity increases per unit of price increase for each brand.
+
+```{r}
+lmInt1 <- lm(logmove~log(price) + brand + log(price):brand, data=oj)
+summary(lmInt1)
+```
+
+We can see that the coefficients for each brand have decreased from the previous model, which tells that brands alone do not influence the quantity demanded as much as we thought they did before. The elasticities for each firm are now -2.7 for Tropicana, -3.3 for minute made, and -3.4 for Dominicks. The elasticities make sense since the more expensive brands have lower elasticites, which reflects the notion that people willing to pay for higher quality orange juice are more inelastic.
+
+```{r}
+library(dplyr)
+ap_fr = oj %>% group_by(brand)  %>%
+                    summarise(average_price = mean(price), 
+                              feature_rate = mean(feat),
+                              average_quantity = mean(logmove))
+ap_fr
+lmFeat = lm(logmove~log(price) + feat, data = oj)
+summary(lmFeat)
+lmFeat_Price = lm(logmove~log(price) + feat + log(price):feat, data = oj)
+summary(lmFeat_Price)
+lmFeat_Brand = lm(logmove~log(price) + brand + feat + log(price):feat + brand:feat + brand:log(price), data = oj)
+summary(lmFeat_Brand)
+lmImportant_Features = lm(logmove~log(price) + brand + feat + log(price):feat + brand:feat + brand:log(price) + EDUC + INCOME + HHLARGE + WORKWOM, data = oj)
+summary(lmImportant_Features)
+```
+
+8. a) Based on the various models above, Tropicana has the least elastic demand and Dominicks has the most elastic demand since Tropicana has the largest coefficients among the three brands and Dominicks has the lowest.
+b) Yes, we expect higher priced goods to be more inelastic since people who shop there will pay the higher price regardless of a price change, and Tropicana has the highest average prices while Dominicks has the lowest.
+c) The unit cost formula is C = P - Q/E. For Tropicana, we have C = 6.24, for Minute-Maid C = 5.04, and for Dominicks C = 4.44. The unit costs are different which makes sense because the brands with higher costs are charging more so they can at least break even or make profit.
+
+```{r}
+lmImportant_Features_Demo = lm(logmove~log(price) + brand + feat + log(price):feat + brand:feat + brand:log(price) + EDUC + INCOME + HHLARGE + WORKWOM + store + week, data = oj)
+summary(lmImportant_Features_Demo)
+```
+
+Disregarding price and the intercept, the demographics with the largest t values were feat, brand, and the interactions between feat and brand. However, store and week still had t values > 2 so they also impacted demand.
+
+```{r}
+logmove_hat <- predict(lmImportant_Features, oj)
+summary(logmove_hat)
+summary(oj$logmove)
+r_squared <- cor(oj$logmove, logmove_hat)^2
+r_squared
+```
+
+```{r}
+train  <- oj %>% dplyr::sample_frac(0.8)
+test <- dplyr::anti_join(oj, train)
+lmImportant_Features = lm(logmove~log(price) + brand + feat + log(price):feat + brand:feat + brand:log(price) + EDUC + INCOME + HHLARGE + WORKWOM, data = train)
+sum1 = summary(lmImportant_Features)
+
+lmImportant_Features_Demo = lm(logmove~log(price) + brand + feat + log(price):feat + brand:feat + brand:log(price) + EDUC + INCOME + HHLARGE + WORKWOM + store + week, data = train)
+sum2 = summary(lmImportant_Features_Demo)
+
+MSE_Train_No_Demo <- mean(sum1$residuals^2)
+MSE_Train_No_Demo
+MSE_Train_Demo <- mean(sum2$residuals^2)
+MSE_Train_Demo
+
+No_demo_prediction <- predict(lmImportant_Features, test)
+demo_prediction <- predict(lmImportant_Features_Demo, test)
+mean((test$logmove - No_demo_prediction)^2)
+mean((test$logmove - demo_prediction)^2)
+```
+
+The test MSE for the model with demographics is lower than the model without demographics, so it is a better fit. 
